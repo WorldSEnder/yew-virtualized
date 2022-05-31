@@ -6,13 +6,18 @@ This component uses the [`ResizeObserver`] API to allow dynamically sized items 
 
 ### Quick Example
 
+```toml
+# Cargo.toml
+yew-virtualized = { git = "https://github.com/WorldSEnder/yew-virtualized", branch = "master" }
+```
+
 ```rust
 fn items(idx: usize) -> Html {
     html! { format!("Item #{idx}") }
 }
 
-#[function_component]
-fn App() -> Html {
+#[function_component(App)]
+fn app() -> Html {
     html! {
         <VirtualList
             // An approximate item height that will be used to guess
@@ -22,7 +27,7 @@ fn App() -> Html {
             // How many items to render, in total.
             item_count={100}
             // Callback function to render individual items by index in 0..item_count
-            {items}
+            items={VirtualList::item_gen(items)}
             // Additional classes to apply to the root node
             classes={"scrollbar"} />
     }
