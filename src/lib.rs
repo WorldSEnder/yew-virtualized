@@ -14,7 +14,22 @@ use web_sys::Element;
 use yew::html::IntoPropValue;
 use yew::prelude::*;
 
-type ItemGenerator = Callback<usize, Html>;
+pub struct ItemGenerator {
+    gen: Rc<dyn Fn(usize) -> Html>,
+}
+
+impl ItemGenerator {
+    fn emit(&self, idx: usize) -> Html { (self.gen)(idx) }
+}
+
+impl PartialEq for ItemGenerator {
+    #[allow(clippy::vtable_address_comparisons)] // We don't care about false negatives
+    fn eq(&self, other: &Self) -> bool { Rc::ptr_eq(&self.gen, &other.gen) }
+}
+
+impl VirtualList {
+    pub fn item_gen(gen: impl 'static + Fn(usize) -> Html) -> ItemGenerator { ItemGenerator { gen: Rc::new(gen) } }
+}
 
 #[derive(PartialEq)]
 pub enum ItemSize {
@@ -72,8 +87,8 @@ impl PartialEq for ScrollWrapperProps {
     fn eq(&self, other: &Self) -> bool { self.children == other.children }
 }
 
-#[function_component]
-fn ScrollItemWrapper(props: &ScrollWrapperProps) -> Html {
+#[function_component(ScrollItemWrapper)]
+fn scroll_item_wrapper(props: &ScrollWrapperProps) -> Html {
     let wrapped_ref = use_node_ref();
     let observed = use_mut_ref(|| Option::<ObservedElement>::None);
     {
@@ -141,6 +156,7 @@ impl ScrollManager {
                     let pos = change.target().unchecked_ref::<PositionedElementDuck>().pos();
                     element_sizes[pos] = change.content_rect().height();
                 }
+                drop(element_sizes);
                 trigger_update.emit(());
             }))
         };

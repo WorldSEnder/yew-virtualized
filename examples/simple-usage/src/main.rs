@@ -6,8 +6,8 @@ struct ItemProps {
     idx: usize,
 }
 
-#[function_component]
-fn Item(ItemProps { idx }: &ItemProps) -> Html {
+#[function_component(Item)]
+fn item(ItemProps { idx }: &ItemProps) -> Html {
     html! {
         <div class={"item"}>
             {format!("Item {idx}")}
@@ -19,15 +19,15 @@ fn items(idx: usize) -> Html {
     html! { <Item {idx} /> }
 }
 
-#[function_component]
-fn App() -> Html {
+#[function_component(App)]
+fn app() -> Html {
     html! {
         <VirtualList
             item_count={100}
             height_prior={30}
-            {items}
+            items={VirtualList::item_gen(items)}
             classes={"scrollbar"} />
     }
 }
 
-fn main() { yew::Renderer::<App>::new().render(); }
+fn main() { yew::start_app::<App>(); }

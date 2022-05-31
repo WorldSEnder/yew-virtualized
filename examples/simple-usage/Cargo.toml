@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 yew-virtualized = { path = "../.." }
-yew = { version = "0.19", git = "https://github.com/yewstack/yew.git", rev = "a6df894f212521647ebba19943cffa2377444da9", features = ["csr"] }
-gloo = "*"
+yew = { version = "0.19" }
