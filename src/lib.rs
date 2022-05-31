@@ -1,4 +1,4 @@
-//! An infinite scroll component for Yew.
+//! A virtualized list component for Yew.
 
 #![deny(
     missing_docs,
@@ -23,7 +23,7 @@ use web_sys::Element;
 use yew::html::IntoPropValue;
 use yew::prelude::*;
 
-/// A wrapper around the method generating individual items in the list.
+/// A wrapper around a method generating individual items in the list.
 ///
 /// To construct such a generator, use [`VirtualList::item_gen`]
 pub struct ItemGenerator {
@@ -344,7 +344,7 @@ fn debounced<E: 'static>(millis: u32, cb: Callback<E>) -> Callback<E> {
     })
 }
 
-/// Internal message type for the virtual list.
+/// Internal message type for a [`VirtualList`].
 #[derive(Debug)]
 pub struct VirtualListMsg(ScrollMsg);
 
@@ -354,8 +354,8 @@ enum ScrollMsg {
     Update,
 }
 
-/// A virtalized list, rendering only items that are also shown on screen to the
-/// user.
+/// A virtualized list, rendering only items that are also shown on screen to
+/// the user.
 ///
 /// ## Example
 ///
@@ -423,7 +423,7 @@ impl Component for VirtualList {
         let contents = self.manager.generate_contents(props);
 
         html! {
-            <div ref={&self.host_ref} class={props.classes.clone()} onscroll={&self.onscroll}>
+            <div ref={&self.host_ref} class={props.classes.clone()} style="overflow-y: scroll;" onscroll={&self.onscroll}>
                 {contents}
             </div>
         }
