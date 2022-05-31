@@ -2,13 +2,17 @@
 
 mod resize_observer;
 
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::cell::RefCell;
+use std::fmt::Display;
+use std::rc::Rc;
 
 use gloo_timers::callback::Timeout;
 use resize_observer::{ObservedElement, ResizeObserver};
-use wasm_bindgen::{prelude::wasm_bindgen, JsCast};
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsCast;
 use web_sys::Element;
-use yew::{html::IntoPropValue, prelude::*};
+use yew::html::IntoPropValue;
+use yew::prelude::*;
 
 type ItemGenerator = Callback<usize, Html>;
 
@@ -26,9 +30,7 @@ impl ItemSize {
 }
 
 impl IntoPropValue<ItemSize> for usize {
-    fn into_prop_value(self) -> ItemSize {
-        ItemSize::Pixels(self)
-    }
+    fn into_prop_value(self) -> ItemSize { ItemSize::Pixels(self) }
 }
 
 impl Display for ItemSize {
@@ -67,9 +69,7 @@ struct ScrollWrapperProps {
 }
 
 impl PartialEq for ScrollWrapperProps {
-    fn eq(&self, other: &Self) -> bool {
-        self.children == other.children
-    }
+    fn eq(&self, other: &Self) -> bool { self.children == other.children }
 }
 
 #[function_component]
@@ -138,10 +138,7 @@ impl ScrollManager {
             Rc::new(ResizeObserver::new(move |change_entries| {
                 let mut element_sizes = shared.element_sizes.borrow_mut();
                 for change in change_entries {
-                    let pos = change
-                        .target()
-                        .unchecked_ref::<PositionedElementDuck>()
-                        .pos();
+                    let pos = change.target().unchecked_ref::<PositionedElementDuck>().pos();
                     element_sizes[pos] = change.content_rect().height();
                 }
                 trigger_update.emit(());
@@ -317,7 +314,8 @@ impl Component for VirtualList {
                 let el = scroll.target_dyn_into::<web_sys::Element>().unwrap();
                 let scroll_top = el.scroll_top();
                 self.manager.update(scroll_top);
-                false // * triggered indirectly via Message::Update
+                // triggered indirectly via Message::Update
+                false
             }
             Self::Message::Update => {
                 self.manager.regenerate_scroll_state(ctx.props());
@@ -339,7 +337,8 @@ impl Component for VirtualList {
 
     fn changed(&mut self, ctx: &Context<Self>) -> bool {
         ctx.link().send_message(Self::Message::Update);
-        false // * triggered indirectly via Message::Update
+        // triggered indirectly via Message::Update
+        false
     }
 
     fn rendered(&mut self, _: &Context<Self>, first_render: bool) {

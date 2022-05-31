@@ -2,10 +2,8 @@ use wasm_bindgen::prelude::Closure;
 use web_sys::Element;
 
 mod raw {
-    use wasm_bindgen::{
-        prelude::{wasm_bindgen, Closure},
-        JsValue,
-    };
+    use wasm_bindgen::prelude::{wasm_bindgen, Closure};
+    use wasm_bindgen::JsValue;
     use web_sys::{DomRectReadOnly, Element};
 
     #[wasm_bindgen]
@@ -18,10 +16,7 @@ mod raw {
         #[wasm_bindgen(method, catch)]
         pub fn disconnect(this: &ResizeObserver) -> Result<(), JsValue>;
         #[wasm_bindgen(method, catch)]
-        pub fn observe(
-            this: &ResizeObserver,
-            element: Element, /* , options? */
-        ) -> Result<(), JsValue>;
+        pub fn observe(this: &ResizeObserver, element: Element /* , options? */) -> Result<(), JsValue>;
         #[wasm_bindgen(method, catch)]
         pub fn unobserve(this: &ResizeObserver, element: Element) -> Result<(), JsValue>;
 
@@ -53,9 +48,7 @@ impl ResizeObserver {
         F: 'static + FnMut(&[raw::ResizeObserverEntry]),
     {
         let closure = Closure::wrap(Box::new(
-            move |entries: Box<[raw::ResizeObserverEntry]>, _this: raw::ResizeObserver| {
-                callback(&entries)
-            },
+            move |entries: Box<[raw::ResizeObserverEntry]>, _this: raw::ResizeObserver| callback(&entries),
         ) as Box<raw::ResizeFn>);
         let observer = raw::ResizeObserver::new(&closure);
         Self {
@@ -65,9 +58,7 @@ impl ResizeObserver {
     }
 
     pub fn observe(&self, element: Element) -> ObservedElement {
-        self.observer
-            .observe(element.clone())
-            .expect("failed js call");
+        self.observer.observe(element.clone()).expect("failed js call");
         ObservedElement {
             observer: Some(self.observer.clone()),
             element,
@@ -76,9 +67,7 @@ impl ResizeObserver {
 }
 
 impl ObservedElement {
-    pub fn element(&self) -> &Element {
-        &self.element
-    }
+    pub fn element(&self) -> &Element { &self.element }
 }
 
 impl Drop for ResizeObserver {
@@ -92,8 +81,7 @@ impl Drop for ResizeObserver {
 impl Drop for ObservedElement {
     fn drop(&mut self) {
         if let Some(this) = self.observer.take() {
-            this.unobserve(self.element.clone())
-                .expect("failed js call");
+            this.unobserve(self.element.clone()).expect("failed js call");
         }
     }
 }

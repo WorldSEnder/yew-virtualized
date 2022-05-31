@@ -30,6 +30,4 @@ fn App() -> Html {
     }
 }
 
-fn main() {
-    yew::Renderer::<App>::new().render();
-}
+fn main() { yew::Renderer::<App>::new().render(); }
