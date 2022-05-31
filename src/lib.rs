@@ -1,7 +1,16 @@
 //! An infinite scroll component for Yew.
 
+#![deny(
+    missing_docs,
+    missing_debug_implementations,
+    bare_trait_objects,
+    anonymous_parameters,
+    elided_lifetimes_in_paths
+)]
+
 mod resize_observer;
 
+use core::fmt;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -14,8 +23,19 @@ use web_sys::Element;
 use yew::html::IntoPropValue;
 use yew::prelude::*;
 
+/// A wrapper around the method generating individual items in the list.
+///
+/// To construct such a generator, use [`VirtualList::item_gen`]
 pub struct ItemGenerator {
     gen: Rc<dyn Fn(usize) -> Html>,
+}
+
+impl fmt::Debug for ItemGenerator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ItemGenerator")
+            .field("gen", &"<function ptr>")
+            .finish_non_exhaustive()
+    }
 }
 
 impl ItemGenerator {
@@ -28,11 +48,16 @@ impl PartialEq for ItemGenerator {
 }
 
 impl VirtualList {
+    /// Construct an [`ItemGenerator`] that can be passed as a value of
+    /// [`VirtualListProps::items`].
     pub fn item_gen(gen: impl 'static + Fn(usize) -> Html) -> ItemGenerator { ItemGenerator { gen: Rc::new(gen) } }
 }
 
-#[derive(PartialEq)]
+/// The height of each items, usually given in pixels.
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum ItemSize {
+    /// A height in pixels
     Pixels(usize),
 }
 
@@ -116,8 +141,8 @@ fn scroll_item_wrapper(props: &ScrollWrapperProps) -> Html {
     }
 }
 
-// Scroll state as reflected during rendering
-#[derive(Default)]
+/// Scroll state as reflected during rendering
+#[derive(Default, Debug)]
 struct EffectiveScrollState {
     first_idx: usize,
     past_last_idx: usize,
@@ -125,12 +150,14 @@ struct EffectiveScrollState {
     hidden_after: f64,
 }
 
-// Backing scroll state, as source of truth for item sizes, etc.
+/// Backing scroll state, as source of truth for item sizes, etc.
+#[derive(Debug)]
 struct BackingScrollState {
     element_sizes: RefCell<Vec<f64>>,
     trigger_update: Callback<()>,
 }
 
+#[derive(Debug)]
 struct ScrollManager {
     host_height: i32,
     scroll_top: i32,
@@ -269,13 +296,34 @@ impl ScrollManager {
     }
 }
 
-#[derive(PartialEq, Properties)]
+/// Properties for a [`VirtualList`].
+#[derive(PartialEq, Properties, Debug)]
 pub struct VirtualListProps {
+    /// A callback to render individual items. Only invoked for items on screen.
+    /// Use [`VirtualList::item_gen`] to create an [`ItemGenerator`].
     pub items: ItemGenerator,
+    /// The number of items in the list, in total. Items that are not visible on
+    /// screen take up scroll space and are lazily instantiated when the user
+    /// scrolls to them later.
     pub item_count: usize,
+    /// An approximate height for items that haven't been rendered, yet, but
+    /// should still take up scroll space. After the first render of an
+    /// item, the height will be adjusted automatically and measured.
+    ///
+    /// Setting this to an inaccurate value will mis-represent the remaining
+    /// scroll distance, but cause no other ill effects.
     pub height_prior: ItemSize,
-    #[prop_or_default]
+    /// Additional classes to apply to the scroll list itself.
+    ///
+    /// ### Gotcha
+    ///
+    /// The list itself is rendered without a max height or other layout
+    /// constraints to stay independent of a particular css solution. Use these
+    /// additional classes to apply additional css to the list.
     pub classes: Classes,
+    /// Individual items are wrapped in a `<div>` to take their measurements in
+    /// a block context. The classes here are applied to each such wrapper.
+    /// Usually, you don't need to supply this property.
     #[prop_or_default]
     pub item_classes: Classes,
 }
@@ -296,11 +344,41 @@ fn debounced<E: 'static>(millis: u32, cb: Callback<E>) -> Callback<E> {
     })
 }
 
-pub enum VirtualListMsg {
+/// Internal message type for the virtual list.
+#[derive(Debug)]
+pub struct VirtualListMsg(ScrollMsg);
+
+#[derive(Debug)]
+enum ScrollMsg {
     Scroll(Event),
     Update,
 }
 
+/// A virtalized list, rendering only items that are also shown on screen to the
+/// user.
+///
+/// ## Example
+///
+/// ```
+/// use yew::prelude::*;
+/// use yew_virtualized::VirtualList;
+///
+/// fn items(idx: usize) -> Html {
+///     html! { format!("Item #{idx}") }
+/// }
+///
+/// #[function_component(App)]
+/// fn app() -> Html {
+///     html! {
+///         <VirtualList
+///             item_count={100}
+///             height_prior={30}
+///             items={VirtualList::item_gen(items)}
+///             classes={"scrollbar"} />
+///     }
+/// }
+/// ```
+#[derive(Debug)]
 pub struct VirtualList {
     manager: ScrollManager,
     onscroll: Callback<Event>,
@@ -312,9 +390,9 @@ impl Component for VirtualList {
     type Properties = VirtualListProps;
 
     fn create(ctx: &Context<Self>) -> Self {
-        let trigger_update = ctx.link().callback(|()| Self::Message::Update);
+        let trigger_update = ctx.link().callback(|()| VirtualListMsg(ScrollMsg::Update));
         let manager = ScrollManager::new(trigger_update);
-        let onscroll = ctx.link().callback(Self::Message::Scroll);
+        let onscroll = ctx.link().callback(|scroll| VirtualListMsg(ScrollMsg::Scroll(scroll)));
         let onscroll = debounced(50, onscroll);
         let host_ref = NodeRef::default();
         Self {
@@ -326,14 +404,14 @@ impl Component for VirtualList {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Self::Message::Scroll(scroll) => {
+            VirtualListMsg(ScrollMsg::Scroll(scroll)) => {
                 let el = scroll.target_dyn_into::<web_sys::Element>().unwrap();
                 let scroll_top = el.scroll_top();
                 self.manager.update(scroll_top);
                 // triggered indirectly via Message::Update
                 false
             }
-            Self::Message::Update => {
+            VirtualListMsg(ScrollMsg::Update) => {
                 self.manager.regenerate_scroll_state(ctx.props());
                 true
             }
@@ -352,7 +430,7 @@ impl Component for VirtualList {
     }
 
     fn changed(&mut self, ctx: &Context<Self>) -> bool {
-        ctx.link().send_message(Self::Message::Update);
+        ctx.link().send_message(VirtualListMsg(ScrollMsg::Update));
         // triggered indirectly via Message::Update
         false
     }

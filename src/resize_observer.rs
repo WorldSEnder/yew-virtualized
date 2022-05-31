@@ -32,6 +32,7 @@ mod raw {
     pub type ResizeCallback = Closure<ResizeFn>;
 }
 
+#[derive(Debug)]
 pub struct ResizeObserver {
     closure: Option<raw::ResizeCallback>,
     observer: raw::ResizeObserver,
