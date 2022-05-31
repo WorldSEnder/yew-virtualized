@@ -202,7 +202,7 @@ impl ScrollManager {
         self.shared.trigger_update.emit(());
     }
 
-    fn update(&mut self, scroll_top: i32) {
+    fn update_scroll(&mut self, scroll_top: i32) {
         if self.scroll_top != scroll_top {
             self.scroll_top = scroll_top;
             self.shared.trigger_update.emit(());
@@ -407,7 +407,7 @@ impl Component for VirtualList {
             VirtualListMsg(ScrollMsg::Scroll(scroll)) => {
                 let el = scroll.target_dyn_into::<web_sys::Element>().unwrap();
                 let scroll_top = el.scroll_top();
-                self.manager.update(scroll_top);
+                self.manager.update_scroll(scroll_top);
                 // triggered indirectly via Message::Update
                 false
             }
