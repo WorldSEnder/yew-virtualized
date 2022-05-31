@@ -101,23 +101,34 @@ fn ScrollItemWrapper(props: &ScrollWrapperProps) -> Html {
     }
 }
 
-struct SharedScrollState {
+// Scroll state as reflected during rendering
+#[derive(Default)]
+struct EffectiveScrollState {
+    first_idx: usize,
+    past_last_idx: usize,
+    hidden_before: f64,
+    hidden_after: f64,
+}
+
+// Backing scroll state, as source of truth for item sizes, etc.
+struct BackingScrollState {
     element_sizes: RefCell<Vec<f64>>,
-    trigger_update: UseForceUpdate,
+    trigger_update: Callback<()>,
 }
 
 struct ScrollManager {
     host_height: i32,
     scroll_top: i32,
     observer: Rc<ResizeObserver>,
-    shared: Rc<SharedScrollState>,
+    shared: Rc<BackingScrollState>,
+    scroll_state: EffectiveScrollState,
 }
 
 impl ScrollManager {
-    fn new(trigger_update: UseForceUpdate) -> Self {
+    fn new(trigger_update: Callback<()>) -> Self {
         let shared = {
             let trigger_update = trigger_update.clone();
-            Rc::new(SharedScrollState {
+            Rc::new(BackingScrollState {
                 element_sizes: RefCell::default(),
                 trigger_update,
             })
@@ -133,7 +144,7 @@ impl ScrollManager {
                         .pos();
                     element_sizes[pos] = change.content_rect().height();
                 }
-                trigger_update.force_update();
+                trigger_update.emit(());
             }))
         };
         ScrollManager {
@@ -141,25 +152,28 @@ impl ScrollManager {
             scroll_top: 0,
             observer,
             shared,
+            scroll_state: Default::default(),
         }
     }
 
     fn mounted(&mut self, host: Element) {
         let height = host.client_height();
         self.host_height = height;
-        self.shared.trigger_update.force_update();
+        self.shared.trigger_update.emit(());
     }
-
-    fn unmount(&mut self) {}
 
     fn update(&mut self, scroll_top: i32) {
         if self.scroll_top != scroll_top {
             self.scroll_top = scroll_top;
-            self.shared.trigger_update.force_update();
+            self.shared.trigger_update.emit(());
         }
     }
 
-    fn generate_contents(&self, props: &VirtualListProps) -> Html {
+    fn regenerate_scroll_state(&mut self, props: &VirtualListProps) {
+        self.scroll_state = self.generate_scroll_state(props);
+    }
+
+    fn generate_scroll_state(&self, props: &VirtualListProps) -> EffectiveScrollState {
         let item_height = props.height_prior.as_scroll_size();
         // take care of some state change
         {
@@ -203,7 +217,22 @@ impl ScrollManager {
         let past_last_idx = past_last_idx.min(props.item_count);
         let hidden_after: f64 = element_sizes[past_last_idx..].iter().sum();
 
-        //let item_height = &props.item_height;
+        EffectiveScrollState {
+            first_idx,
+            past_last_idx,
+            hidden_before,
+            hidden_after,
+        }
+    }
+
+    fn generate_contents(&self, props: &VirtualListProps) -> Html {
+        let EffectiveScrollState {
+            first_idx,
+            past_last_idx,
+            hidden_before,
+            hidden_after,
+        } = self.scroll_state;
+
         let items = (first_idx..past_last_idx).map(|i| {
             let item = props.items.emit(i);
             html! {
@@ -238,68 +267,85 @@ pub struct VirtualListProps {
     pub item_classes: Classes,
 }
 
-#[hook]
-fn use_debounce<E: 'static>(millis: u32, cb: Callback<E>) -> Callback<E> {
-    (*use_memo(
-        |cb| {
-            let cb = cb.clone();
-            let debounced = Rc::new(RefCell::new(None));
-            Callback::from(move |scroll| {
-                let mut debounced_ref = debounced.borrow_mut();
-                if (*debounced_ref).is_some() {
-                    return;
-                }
-                let cb = cb.clone();
-                let debounced = debounced.clone();
-                *debounced_ref = Some(Timeout::new(millis, move || {
-                    cb.emit(scroll);
-                    *debounced.borrow_mut() = None;
-                }))
-            })
-        },
-        cb,
-    ))
-    .clone()
+fn debounced<E: 'static>(millis: u32, cb: Callback<E>) -> Callback<E> {
+    let debounced = Rc::new(RefCell::new(None));
+    Callback::from(move |scroll| {
+        let mut debounced_ref = debounced.borrow_mut();
+        if (*debounced_ref).is_some() {
+            return;
+        }
+        let cb = cb.clone();
+        let debounced = debounced.clone();
+        *debounced_ref = Some(Timeout::new(millis, move || {
+            cb.emit(scroll);
+            *debounced.borrow_mut() = None;
+        }))
+    })
 }
 
-#[function_component]
-pub fn VirtualList(props: &VirtualListProps) -> Html {
-    let update = use_force_update();
-    let manager = use_mut_ref(|| ScrollManager::new(update));
+pub enum VirtualListMsg {
+    Scroll(Event),
+    Update,
+}
 
-    let host_ref = use_node_ref();
-    {
-        let scroll_manager = manager.clone();
-        let host_ref = host_ref.clone();
-        use_effect_with_deps(
-            move |_| {
-                let host = host_ref.cast::<Element>().unwrap();
-                scroll_manager.borrow_mut().mounted(host);
-                move || {
-                    scroll_manager.borrow_mut().unmount();
-                }
-            },
-            (),
-        );
+pub struct VirtualList {
+    manager: ScrollManager,
+    onscroll: Callback<Event>,
+    host_ref: NodeRef,
+}
+
+impl Component for VirtualList {
+    type Message = VirtualListMsg;
+    type Properties = VirtualListProps;
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let trigger_update = ctx.link().callback(|()| Self::Message::Update);
+        let manager = ScrollManager::new(trigger_update);
+        let onscroll = ctx.link().callback(Self::Message::Scroll);
+        let onscroll = debounced(50, onscroll);
+        let host_ref = NodeRef::default();
+        Self {
+            manager,
+            onscroll,
+            host_ref,
+        }
     }
 
-    let onscroll = {
-        let scroll_manager = manager.clone();
-        let cb = use_callback(
-            move |scroll: Event, _| {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            Self::Message::Scroll(scroll) => {
                 let el = scroll.target_dyn_into::<web_sys::Element>().unwrap();
                 let scroll_top = el.scroll_top();
-                scroll_manager.borrow_mut().update(scroll_top);
-            },
-            (),
-        );
-        use_debounce(50, cb)
-    };
-    let contents = (*manager).borrow_mut().generate_contents(props);
+                self.manager.update(scroll_top);
+                false // * triggered indirectly via Message::Update
+            }
+            Self::Message::Update => {
+                self.manager.regenerate_scroll_state(ctx.props());
+                true
+            }
+        }
+    }
 
-    html! {
-        <div ref={host_ref} class={props.classes.clone()} {onscroll}>
-            {contents}
-        </div>
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let props = ctx.props();
+        let contents = self.manager.generate_contents(props);
+
+        html! {
+            <div ref={&self.host_ref} class={props.classes.clone()} onscroll={&self.onscroll}>
+                {contents}
+            </div>
+        }
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>) -> bool {
+        ctx.link().send_message(Self::Message::Update);
+        false // * triggered indirectly via Message::Update
+    }
+
+    fn rendered(&mut self, _: &Context<Self>, first_render: bool) {
+        if first_render {
+            let host = self.host_ref.cast::<Element>().unwrap();
+            self.manager.mounted(host);
+        }
     }
 }
