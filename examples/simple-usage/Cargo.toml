@@ -1,0 +1,11 @@
+[package]
+name = "simple-usage"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+yew-virtualized = { path = "../.." }
+yew = { version = "0.19", git = "https://github.com/yewstack/yew.git", rev = "a6df894f212521647ebba19943cffa2377444da9", features = ["csr"] }
+gloo = "*"
