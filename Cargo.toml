@@ -16,6 +16,7 @@ keywords = ["web", "webasm", "yew", "virtual", "list"]
 categories = ["gui", "wasm", "web-programming"]
 description = "A yew component that renders only the on-screen part of a scrollable list"
 readme = "README.md"
+repository = "https://github.com/WorldSEnder/yew-virtualized"
 
 [dependencies]
 yew = { version = "0.19" }
