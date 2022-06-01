@@ -8,7 +8,7 @@ This component uses the [`ResizeObserver`] API to allow dynamically sized items 
 
 ```toml
 # Cargo.toml
-yew-virtualized = { git = "https://github.com/WorldSEnder/yew-virtualized", branch = "master" }
+yew-virtualized = "0.1.0"
 ```
 
 ```rust
