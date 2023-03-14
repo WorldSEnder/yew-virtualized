@@ -19,7 +19,7 @@ readme = "README.md"
 repository = "https://github.com/WorldSEnder/yew-virtualized"
 
 [dependencies]
-yew = { version = "0.19" }
+yew = { version = "0.20" }
 web-sys = { version = "0.3", features = ["DomRectReadOnly"] }
 gloo-timers = "0.2"
 wasm-bindgen = "0.2"

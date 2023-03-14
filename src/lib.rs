@@ -429,7 +429,7 @@ impl Component for VirtualList {
         }
     }
 
-    fn changed(&mut self, ctx: &Context<Self>) -> bool {
+    fn changed(&mut self, ctx: &Context<Self>, _props: &<Self as yew::Component>::Properties) -> bool {
         ctx.link().send_message(VirtualListMsg(ScrollMsg::Update));
         // triggered indirectly via Message::Update
         false
