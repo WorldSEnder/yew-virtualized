@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "yew-virtualized"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = [
   "Martin Molzer <WorldSEnder@users.noreply.github.com>",
@@ -28,3 +28,4 @@ js-sys = "0.3"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "documenting"]
+
