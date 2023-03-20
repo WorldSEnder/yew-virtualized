@@ -6,12 +6,9 @@ This component uses the [`ResizeObserver`] API to allow dynamically sized items 
 
 ### Quick Example
 
-```toml
-# Cargo.toml
-yew-virtualized = "0.1.0"
-```
-
 ```rust
+use yew_virtualized::VirtualList;
+
 fn items(idx: usize) -> Html {
     html! { format!("Item #{idx}") }
 }
