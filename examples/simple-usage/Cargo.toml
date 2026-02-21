@@ -12,5 +12,5 @@ publish = false
 
 [dependencies]
 yew-virtualized = { path = "../.." }
-yew = { version = "0.20", features = ["csr"] }
+yew = { version = "0.22", features = ["csr"] }
 
